@@ -48,3 +48,9 @@ export interface JobMatch {
   missingSkills: string[];
   suggestions: string[];
 }
+
+export interface FileConversion {
+  originalFile: File;
+  textFile: File;
+  text: string;
+}

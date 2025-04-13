@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Upload, Loader2 } from 'lucide-react';
+
+import { Upload, Loader2, FileText } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { ResumeAnalysis } from '../components/ResumeAnalysis';
 import { JobMatcher } from '../components/JobMatcher';
 import { analyzeResume } from '../lib/gemini';
-import type { ResumeAnalysis as ResumeAnalysisType } from '../types';
+import { convertToText } from '../lib/fileConverter';
+import type { ResumeAnalysis as ResumeAnalysisType, FileConversion } from '../types';
 
 export const Home: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -13,6 +15,8 @@ export const Home: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [retryDelay, setRetryDelay] = useState(0);
+  const [convertedFile, setConvertedFile] = useState<File | null>(null);
+  const [conversionStatus, setConversionStatus] = useState<string>('');
 
   const handleRetry = (attempt: number, delay: number) => {
     setRetryCount(attempt);
@@ -42,21 +46,39 @@ export const Home: React.FC = () => {
     const file = acceptedFiles[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const text = e.target?.result as string;
+    setIsAnalyzing(true);
+    setError(null);
+    setConversionStatus('Converting file to text format...');
+    
+    try {
+      // Convert the file to .txt format first
+      const { text, textFile } = await convertToText(file);
+      
+      // Store the converted text file
+      setConvertedFile(textFile);
+      setConversionStatus(`File converted to: ${textFile.name}`);
+      console.log(`Original file converted to: ${textFile.name} (${textFile.size} bytes)`);
+      
+      // Proceed with analysis using only the text content from the .txt file
+      setConversionStatus('Analyzing converted text file...');
       await handleFileAnalysis(text);
-    };
-    reader.readAsText(file);
+    } catch (error: any) {
+      console.error('Error processing file:', error);
+      setError(error.message || 'An error occurred while processing the file.');
+      setConversionStatus('');
+      setIsAnalyzing(false);
+    }
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       'application/pdf': ['.pdf'],
-      'application/msword': ['.doc', '.docx'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/msword': ['.doc'],
       'text/plain': ['.txt']
-    }
+    },
+    maxSize: 10485760 // 10MB
   });
 
   return (
@@ -83,18 +105,34 @@ export const Home: React.FC = () => {
             <div className="space-y-1 text-center">
               <input {...getInputProps()} />
               {isAnalyzing ? (
-                <Loader2 className="mx-auto h-12 w-12 text-primary-500 animate-spin" />
+                <>
+                  <Loader2 className="mx-auto h-12 w-12 text-primary-500 animate-spin" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{conversionStatus}</p>
+                </>
               ) : (
-                <Upload className="mx-auto h-12 w-12 text-gray-400" aria-hidden="true" />
+                <>
+                  {convertedFile ? (
+                    <FileText className="mx-auto h-12 w-12 text-green-500" aria-hidden="true" />
+                  ) : (
+                    <Upload className="mx-auto h-12 w-12 text-gray-400" aria-hidden="true" />
+                  )}
+                </>
               )}
               <div className="flex text-sm text-gray-600 dark:text-gray-400">
                 <label className="relative cursor-pointer rounded-md font-medium text-primary-600 dark:text-primary-400 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
-                  <span>{isAnalyzing ? 'Analyzing...' : 'Upload a file'}</span>
+                  <span>
+                    {isAnalyzing 
+                      ? 'Processing...' 
+                      : convertedFile 
+                        ? 'File converted to TXT. Upload another?' 
+                        : 'Upload a file'
+                    }
+                  </span>
                 </label>
-                {!isAnalyzing && <p className="pl-1">or drag and drop</p>}
+                {!isAnalyzing && !convertedFile && <p className="pl-1">or drag and drop</p>}
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                PDF, DOCX, or TXT up to 10MB
+                PDF, DOCX, or TXT up to 10MB (all files will be converted to .txt for analysis)
               </p>
             </div>
           </div>

@@ -44,6 +44,8 @@ export const analyzeResume = async (
   resumeText: string,
   onRetry?: (attempt: number, delay: number) => void
 ): Promise<string> => {
+  // This function expects text input from a .txt file
+  // All file conversions should happen before calling this function
   try {
     const operation = async () => {
       const prompt = `You are an expert resume analyzer. Analyze this resume and provide detailed feedback on format, content, and ATS optimization. Return the analysis in JSON format with the following structure:
@@ -98,6 +100,8 @@ export const matchJobDescription = async (
   jobDescription: string,
   onRetry?: (attempt: number, delay: number) => void
 ): Promise<string> => {
+  // This function expects text input from a .txt file
+  // All file conversions should happen before calling this function
   try {
     const operation = async () => {
       const prompt = `Compare this resume with the job description and provide a detailed analysis in JSON format with the following structure:
